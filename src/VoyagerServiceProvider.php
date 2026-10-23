@@ -66,6 +66,8 @@ class VoyagerServiceProvider extends ServiceProvider
             return new Voyager();
         });
 
+        $this->allowCachedMenuClasses();
+
         // Laravel 13 binds Illuminate\Image\ImageManager to "image", Voyager uses Intervention Image v2
         $this->app->singleton('voyager.image', function ($app) {
             $driver = $app['config']->get('image.driver');
@@ -367,6 +369,26 @@ class VoyagerServiceProvider extends ServiceProvider
     /**
      * Register the commands accessible from the App.
      */
+    /**
+     * Laravel 13 does not unserialize PHP classes from the cache unless they are listed in
+     * "cache.serializable_classes", Menu::display() caches the menu with its items.
+     */
+    private function allowCachedMenuClasses()
+    {
+        $config = $this->app['config'];
+        $allowed = $config->get('cache.serializable_classes');
+
+        // null - option is missing (Laravel < 13 config), true - every class is allowed
+        if ($allowed === null || $allowed === true) {
+            return;
+        }
+
+        $config->set('cache.serializable_classes', array_values(array_unique(array_merge(
+            is_array($allowed) ? $allowed : [],
+            [Models\Menu::class, MenuItem::class, Collection::class]
+        ))));
+    }
+
     private function registerAppCommands()
     {
         $this->commands(Commands\MakeModelCommand::class);
