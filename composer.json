@@ -1,16 +1,16 @@
 {
-  "name": "wampirusy/voyager",
-  "description": "A Laravel Admin Package for The Control Group to make your life easier and steer your project in the right direction",
+  "name": "shapilokk/voyager",
+  "description": "Voyager (tcg/voyager) fork for Laravel 11-13 with security fixes (CVE-2024-55415, CVE-2024-55416, CVE-2024-55417)",
   "keywords": [
     "laravel",
     "admin",
     "panel"
   ],
   "license": "MIT",
-  "homepage": "https://voyager.devdojo.com/",
+  "homepage": "https://github.com/shapilokk/voyager",
   "support": {
-    "issues": "https://github.com/the-control-group/voyager/issues",
-    "source": "https://github.com/the-control-group/voyager"
+    "issues": "https://github.com/shapilokk/voyager/issues",
+    "source": "https://github.com/shapilokk/voyager"
   },
   "authors": [
     {
@@ -19,7 +19,7 @@
     }
   ],
   "require": {
-    "php": "^8.2|^8.3|^8.4|^8.5",
+    "php": "^8.2",
     "illuminate/support": "11.*|^12.0|^13.0",
     "intervention/image": "^2.7",
     "laravel/ui": ">=1.0",
@@ -54,18 +54,14 @@
         "TCG\\Voyager\\VoyagerServiceProvider",
         "TCG\\Voyager\\Providers\\VoyagerDummyServiceProvider"
       ]
+    },
+    "branch-alias": {
+      "dev-master": "1.9.x-dev"
     }
   },
   "scripts": {
     "post-autoload-dump": [
       "@php vendor/bin/testbench package:discover --ansi"
     ]
-  },
-  "config": {
-    "policy": {
-      "advisories": {
-        "block": false
-      }
-    }
   }
 }

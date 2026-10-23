@@ -1,5 +1,25 @@
 <p align="center"><a href="https://voyager.devdojo.com" target="_blank"><img width="400" src="https://s3.amazonaws.com/thecontrolgroup/voyager.png"></a></p>
 
+> [!Important]
+> **shapilokk/voyager** is a fork of [Wampirusy/voyager](https://github.com/Wampirusy/voyager) (itself a fork of the archived `tcg/voyager`)
+> for Laravel 11 / 12 / 13 and PHP 8.2+, with fixes for the publicly disclosed vulnerabilities:
+>
+> - **CVE-2024-55417** - arbitrary file write / RCE via the media manager upload. Uploads are checked against an extension
+>   allow-list (`voyager.media.allowed_extensions`) and a hard deny-list of executable extensions, file names are sanitized,
+>   paths are normalized. The same checks apply to BREAD `file`, `image`, `multiple_images` fields and the TinyMCE image upload.
+> - **CVE-2024-55415** - arbitrary file read / deletion via the Compass log viewer. Only `*.log` files inside `storage/logs` are accepted.
+> - **CVE-2024-55416** - XSS via the flash message rendered by toastr. The message is escaped.
+>
+> Installation:
+>
+> ```json
+> "repositories": [{"type": "vcs", "url": "https://github.com/shapilokk/voyager"}],
+> "require": {"shapilokk/voyager": "^1.9"}
+> ```
+>
+> The PHP namespace stays `TCG\Voyager`, so no code changes are required when switching from `tcg/voyager`.
+> It is still recommended to restrict access to `/admin` and to disable PHP execution in the public storage directory.
+
 > [!Warning]
 > We have decided to archive Voyager as there are many more modern options available. You may still use Voyager, but it will not be receiving any more updates. Here are some alternatives that we recommend:
 
