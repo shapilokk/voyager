@@ -18,4 +18,17 @@ class Image extends Facade
     {
         return 'voyager.image';
     }
+
+    /**
+     * Rotates the image according to its EXIF data. Without the exif extension the image
+     * is kept as is instead of failing the whole upload.
+     *
+     * @param \Intervention\Image\Image $image
+     *
+     * @return \Intervention\Image\Image
+     */
+    public static function orientate($image)
+    {
+        return function_exists('exif_read_data') ? $image->orientate() : $image;
+    }
 }

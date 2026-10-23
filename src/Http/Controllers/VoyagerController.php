@@ -68,7 +68,7 @@ class VoyagerController extends Controller
                     $constraint->upsize();
                 });
             if ($ext !== 'gif') {
-                $image->orientate();
+                Image::orientate($image);
             }
             $image->encode($extension, 75);
 

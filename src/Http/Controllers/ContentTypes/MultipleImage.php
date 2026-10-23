@@ -28,7 +28,7 @@ class MultipleImage extends BaseType
             }
             $this->guardUpload($file, UploadGuard::IMAGE_EXTENSIONS);
 
-            $image = InterventionImage::make($file)->orientate();
+            $image = InterventionImage::orientate(InterventionImage::make($file));
 
             $resize_width = null;
             $resize_height = null;
@@ -82,8 +82,7 @@ class MultipleImage extends BaseType
                             $thumb_resize_height = $thumb_resize_height * $scale;
                         }
 
-                        $image = InterventionImage::make($file)
-                            ->orientate()
+                        $image = InterventionImage::orientate(InterventionImage::make($file))
                             ->resize(
                                 $thumb_resize_width,
                                 $thumb_resize_height,
@@ -97,8 +96,7 @@ class MultipleImage extends BaseType
                     } elseif (isset($this->options->thumbnails) && isset($thumbnails->crop->width) && isset($thumbnails->crop->height)) {
                         $crop_width = $thumbnails->crop->width;
                         $crop_height = $thumbnails->crop->height;
-                        $image = InterventionImage::make($file)
-                            ->orientate()
+                        $image = InterventionImage::orientate(InterventionImage::make($file))
                             ->fit($crop_width, $crop_height)
                             ->encode(strtolower($file->getClientOriginalExtension()), $resize_quality);
                     }

@@ -294,7 +294,7 @@ class VoyagerMediaController extends Controller
                 if ($extension == 'gif') {
                     copy($request->file->getRealPath(), $realPath.$file);
                 } else {
-                    $image = $image->orientate();
+                    $image = Image::orientate($image);
                     // Generate thumbnails
                     if (property_exists($details, 'thumbnails') && is_array($details->thumbnails)) {
                         foreach ($details->thumbnails as $thumbnail_data) {

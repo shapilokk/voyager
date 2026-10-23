@@ -20,7 +20,7 @@ class Image extends BaseType
 
             $filename = $this->generateFileName($file, $path);
 
-            $image = InterventionImage::make($file)->orientate();
+            $image = InterventionImage::orientate(InterventionImage::make($file));
 
             $fullPath = $path.$filename.'.'.strtolower($file->getClientOriginalExtension());
 
@@ -76,8 +76,7 @@ class Image extends BaseType
                             $thumb_resize_height = intval($thumb_resize_height * $scale);
                         }
 
-                        $image = InterventionImage::make($file)
-                            ->orientate()
+                        $image = InterventionImage::orientate(InterventionImage::make($file))
                             ->resize(
                                 $thumb_resize_width,
                                 $thumb_resize_height,
@@ -91,8 +90,7 @@ class Image extends BaseType
                     } elseif (isset($thumbnails->crop->width) && isset($thumbnails->crop->height)) {
                         $crop_width = $thumbnails->crop->width;
                         $crop_height = $thumbnails->crop->height;
-                        $image = InterventionImage::make($file)
-                            ->orientate()
+                        $image = InterventionImage::orientate(InterventionImage::make($file))
                             ->fit($crop_width, $crop_height)
                             ->encode(strtolower($file->getClientOriginalExtension()), $resize_quality);
                     }
