@@ -7,9 +7,10 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-use Intervention\Image\Facades\Image;
 use TCG\Voyager\Events\MediaFileAdded;
+use TCG\Voyager\Facades\Image;
 use TCG\Voyager\Facades\Voyager;
+use TCG\Voyager\Helpers\UploadGuard;
 
 class VoyagerMediaController extends Controller
 {
@@ -44,11 +45,7 @@ class VoyagerMediaController extends Controller
             $thumbnail_names = array_column(($options['thumbnails'] ?? []), 'name');
         }
 
-        $folder = $request->folder;
-
-        if ($folder == '/') {
-            $folder = '';
-        }
+        $folder = $this->safePath($request->folder);
 
         $dir = $this->directory.$folder;
 
@@ -115,11 +112,13 @@ class VoyagerMediaController extends Controller
         // Check permission
         $this->authorize('browse_media');
 
-        $new_folder = $request->new_folder;
+        $new_folder = $this->safePath($request->new_folder);
         $success = false;
         $error = '';
 
-        if (Storage::disk($this->filesystem)->exists($new_folder)) {
+        if ($new_folder === '') {
+            $error = __('voyager::media.error_creating_dir');
+        } elseif (Storage::disk($this->filesystem)->exists($new_folder)) {
             $error = __('voyager::media.folder_exists_already');
         } elseif (Storage::disk($this->filesystem)->makeDirectory($new_folder)) {
             $success = true;
@@ -135,13 +134,17 @@ class VoyagerMediaController extends Controller
         // Check permission
         $this->authorize('browse_media');
 
-        $path = str_replace('//', '/', Str::finish($request->path, '/'));
+        $path = $this->safePath($request->path);
         $success = true;
         $error = '';
 
         foreach ($request->get('files') as $file) {
-            $file_path = $path.$file['name'];
-            if ($file['type'] == 'folder') {
+            $file_path = $this->safePath($path.'/'.$file['name']);
+            if ($file_path === '' || $file_path === $this->safePath(config('voyager.media.path', '/'))) {
+                // Never delete the root of the media disk
+                $error = __('voyager::media.error_deleting_folder');
+                $success = false;
+            } elseif ($file['type'] == 'folder') {
                 if (!Storage::disk($this->filesystem)->deleteDirectory($file_path)) {
                     $error = __('voyager::media.error_deleting_folder');
                     $success = false;
@@ -159,20 +162,23 @@ class VoyagerMediaController extends Controller
     {
         // Check permission
         $this->authorize('browse_media');
-        $path = str_replace('//', '/', Str::finish($request->path, '/'));
-        $dest = str_replace('//', '/', Str::finish($request->destination, '/'));
-        if (strpos($dest, '/../') !== false) {
-            $dest = substr($path, 0, -1);
-            $dest = substr($dest, 0, strripos($dest, '/') + 1);
+        $path = $this->safePath($request->path);
+        if (strpos(Str::finish((string) $request->destination, '/'), '/../') !== false) {
+            // "../" option in the UI: move to the parent folder
+            $dest = Str::contains($path, '/') ? Str::beforeLast($path, '/') : '';
+        } else {
+            $dest = $this->safePath($request->destination);
         }
-        $dest = str_replace('//', '/', Str::finish($dest, '/'));
+        $path = $path === '' ? '' : $path.'/';
+        $dest = $dest === '' ? '' : $dest.'/';
 
         $success = true;
         $error = '';
 
         foreach ($request->get('files') as $file) {
-            $old_path = $path.$file['name'];
-            $new_path = $dest.$file['name'];
+            $name = basename(str_replace('\\', '/', (string) $file['name']));
+            $old_path = $path.$name;
+            $new_path = $dest.$name;
 
             try {
                 Storage::disk($this->filesystem)->move($old_path, $new_path);
@@ -193,19 +199,25 @@ class VoyagerMediaController extends Controller
         $this->authorize('browse_media');
 
         $folderLocation = $request->folder_location;
-        $filename = $request->filename;
-        $newFilename = $request->new_filename;
+        $filename = (string) $request->filename;
+        $newFilename = (string) $request->new_filename;
         $success = false;
         $error = false;
 
-        if (pathinfo($filename)['extension'] !== pathinfo($newFilename)['extension']) {
-            $error = __('voyager::media.error_renaming_ext');
-        } else {
-            if (is_array($folderLocation)) {
-                $folderLocation = rtrim(implode('/', $folderLocation), '/');
-            }
+        if (is_array($folderLocation)) {
+            $folderLocation = implode('/', $folderLocation);
+        }
+        $location = $this->safePath($this->directory.'/'.$folderLocation);
+        $isFolder = Storage::disk($this->filesystem)->directoryExists("{$location}/{$filename}");
 
-            $location = "{$this->directory}/{$folderLocation}";
+        if (pathinfo($filename, PATHINFO_EXTENSION) !== pathinfo($newFilename, PATHINFO_EXTENSION)) {
+            $error = __('voyager::media.error_renaming_ext');
+        } elseif ($this->safePath($filename) !== $filename
+            || $this->safePath($newFilename) !== $newFilename
+            || Str::contains($filename.$newFilename, '/')
+            || (!$isFolder && !UploadGuard::isAllowedFileName($newFilename))) {
+            $error = __('voyager::generic.path_not_allowed');
+        } else {
 
             if (!Storage::disk($this->filesystem)->exists("{$location}/{$newFilename}")) {
                 if (Storage::disk($this->filesystem)->move("{$location}/{$filename}", "{$location}/{$newFilename}")) {
@@ -226,13 +238,16 @@ class VoyagerMediaController extends Controller
         // Check permission
         $this->authorize('browse_media');
 
-        $extension = $request->file->getClientOriginalExtension();
-        $name = Str::replaceLast('.'.$extension, '', $request->file->getClientOriginalName());
-        $details = json_decode($request->get('details') ?? '{}');
-        $absolute_path = Storage::disk($this->filesystem)->path($request->upload_path);
+        $details = json_decode($request->get('details') ?? '{}') ?: new \stdClass();
 
         try {
             $realPath = Storage::disk($this->filesystem)->path('/');
+
+            // CVE-2024-55417: never trust the client extension
+            $extension = UploadGuard::assertAllowedFile($request->file);
+            $name = UploadGuard::sanitizeFileName(pathinfo($request->file->getClientOriginalName(), PATHINFO_FILENAME));
+            $uploadPath = UploadGuard::normalizePath($request->upload_path);
+            $uploadPath = $uploadPath === '' ? '' : $uploadPath.'/';
 
             $allowedMimeTypes = config('voyager.media.allowed_mimetypes', '*');
             if ($allowedMimeTypes != '*' && (is_array($allowedMimeTypes) && !in_array($request->file->getMimeType(), $allowedMimeTypes))) {
@@ -240,7 +255,7 @@ class VoyagerMediaController extends Controller
             }
 
             if (!$request->has('filename') || $request->get('filename') == 'null') {
-                while (Storage::disk($this->filesystem)->exists(Str::finish($request->upload_path, '/').$name.'.'.$extension, $this->filesystem)) {
+                while (Storage::disk($this->filesystem)->exists($uploadPath.$name.'.'.$extension)) {
                     $name = get_file_name($name);
                 }
             } else {
@@ -255,9 +270,14 @@ class VoyagerMediaController extends Controller
                         return Str::random($random[1]);
                     }, $name);
                 }
+                // The name may contain sub folders ({uid}/avatar), sanitize every segment
+                $name = implode('/', array_map(
+                    [UploadGuard::class, 'sanitizeFileName'],
+                    explode('/', UploadGuard::normalizePath($name))
+                ));
             }
 
-            $file = $request->file->storeAs($request->upload_path, $name.'.'.$extension, $this->filesystem);
+            $file = $request->file->storeAs($uploadPath, $name.'.'.$extension, $this->filesystem);
             $file = preg_replace('#/+#', '/', $file);
 
             $imageMimeTypes = [
@@ -267,11 +287,11 @@ class VoyagerMediaController extends Controller
                 'image/bmp',
                 'image/svg+xml',
             ];
-            if (in_array($request->file->getMimeType(), $imageMimeTypes)) {
+            if (in_array($request->file->getMimeType(), $imageMimeTypes) && in_array($extension, UploadGuard::IMAGE_EXTENSIONS, true)) {
                 $content = Storage::disk($this->filesystem)->get($file);
                 $image = Image::make($content);
 
-                if ($request->file->getClientOriginalExtension() == 'gif') {
+                if ($extension == 'gif') {
                     copy($request->file->getRealPath(), $realPath.$file);
                 } else {
                     $image = $image->orientate();
@@ -316,7 +336,7 @@ class VoyagerMediaController extends Controller
                             ) {
                                 $thumbnail = $this->addWatermarkToImage($thumbnail, $details->watermark);
                             }
-                            $thumbnail_file = $request->upload_path.$name.'-'.($thumbnail_data->name ?? 'thumbnail').'.'.$extension;
+                            $thumbnail_file = $uploadPath.$name.'-'.UploadGuard::sanitizeFileName($thumbnail_data->name ?? 'thumbnail').'.'.$extension;
                             Storage::disk($this->filesystem)->put($thumbnail_file, $thumbnail->encode($extension, ($details->quality ?? 90))->encoded);
                         }
                     }
@@ -353,17 +373,22 @@ class VoyagerMediaController extends Controller
         $height = $request->get('height');
         $width = $request->get('width');
 
-        $realPath = Storage::disk($this->filesystem)->path('/');
-        $originImagePath = $request->upload_path.'/'.$request->originImageName;
-        $originImagePath = preg_replace('#/+#', '/', $originImagePath);
-
         try {
+            $uploadPath = UploadGuard::normalizePath($request->upload_path);
+            $originImageName = basename(str_replace('\\', '/', (string) $request->originImageName));
+            $originImagePath = UploadGuard::normalizePath($uploadPath.'/'.$originImageName);
+
+            if (!UploadGuard::isAllowedFileName($originImageName)
+                || !in_array(strtolower(pathinfo($originImageName, PATHINFO_EXTENSION)), UploadGuard::IMAGE_EXTENSIONS, true)) {
+                throw new Exception(__('voyager::generic.extension_not_allowed', ['extension' => UploadGuard::displayExtension($originImageName)]));
+            }
+
             if ($createMode) {
                 // create a new image with the cpopped data
-                $fileNameParts = explode('.', $request->originImageName);
+                $fileNameParts = explode('.', $originImageName);
                 array_splice($fileNameParts, count($fileNameParts) - 1, 0, 'cropped_'.time());
                 $newImageName = implode('.', $fileNameParts);
-                $destImagePath = preg_replace('#/+#', '/', $request->upload_path.'/'.$newImageName);
+                $destImagePath = UploadGuard::normalizePath($uploadPath.'/'.$newImageName);
             } else {
                 // override the original image
                 $destImagePath = $originImagePath;
@@ -383,9 +408,26 @@ class VoyagerMediaController extends Controller
         return response()->json(compact('success', 'message'));
     }
 
+    /**
+     * Normalizes a path from the request, aborts on path traversal.
+     *
+     * @param string|null $path
+     *
+     * @return string
+     */
+    private function safePath($path)
+    {
+        try {
+            return UploadGuard::normalizePath($path);
+        } catch (Exception $e) {
+            abort(400, $e->getMessage());
+        }
+    }
+
     private function addWatermarkToImage($image, $options)
     {
-        $watermark = Image::make(Storage::disk($this->filesystem)->path($options->source));
+        // Read through the disk (normalized path) instead of an absolute path built from the request
+        $watermark = Image::make(Storage::disk($this->filesystem)->get(UploadGuard::normalizePath($options->source)));
         // Resize watermark
         $width = $image->width() * (($options->size ?? 15) / 100);
         $watermark->resize($width, null, function ($constraint) {

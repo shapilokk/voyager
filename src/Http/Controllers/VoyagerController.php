@@ -8,8 +8,9 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Intervention\Image\Constraint;
-use Intervention\Image\Facades\Image;
+use TCG\Voyager\Facades\Image;
 use TCG\Voyager\Facades\Voyager;
+use TCG\Voyager\Helpers\UploadGuard;
 
 class VoyagerController extends Controller
 {
@@ -41,19 +42,26 @@ class VoyagerController extends Controller
 
         $path = $slug.'/'.date('FY').'/';
 
-        $filename = basename($file->getClientOriginalName(), '.'.$file->getClientOriginalExtension());
+        // CVE-2024-55417: only images, never trust the client extension
+        try {
+            $extension = UploadGuard::assertAllowedFile($file, ['jpeg', 'jpg', 'png', 'gif']);
+        } catch (\Exception $e) {
+            $extension = null;
+        }
+
+        $filename = UploadGuard::sanitizeFileName(pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME));
         $filename_counter = 1;
 
         // Make sure the filename does not exist, if it does make sure to add a number to the end 1, 2, 3, etc...
-        while (Storage::disk(config('voyager.storage.disk'))->exists($path.$filename.'.'.$file->getClientOriginalExtension())) {
-            $filename = basename($file->getClientOriginalName(), '.'.$file->getClientOriginalExtension()).(string) ($filename_counter++);
+        while (Storage::disk(config('voyager.storage.disk'))->exists($path.$filename.'.'.$extension)) {
+            $filename = UploadGuard::sanitizeFileName(pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME)).(string) ($filename_counter++);
         }
 
-        $fullPath = $path.$filename.'.'.$file->getClientOriginalExtension();
+        $fullPath = $path.$filename.'.'.$extension;
 
         $ext = $file->guessClientExtension();
 
-        if (in_array($ext, ['jpeg', 'jpg', 'png', 'gif'])) {
+        if ($extension !== null && in_array($ext, ['jpeg', 'jpg', 'png', 'gif'])) {
             $image = Image::make($file)
                 ->resize($resizeWidth, $resizeHeight, function (Constraint $constraint) {
                     $constraint->aspectRatio();
@@ -62,7 +70,7 @@ class VoyagerController extends Controller
             if ($ext !== 'gif') {
                 $image->orientate();
             }
-            $image->encode($file->getClientOriginalExtension(), 75);
+            $image->encode($extension, 75);
 
             // move uploaded file from temp to uploads directory
             if (Storage::disk(config('voyager.storage.disk'))->put($fullPath, (string) $image, 'public')) {

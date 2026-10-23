@@ -8,7 +8,7 @@ use TCG\Voyager\Database\Types\Type;
 
 abstract class Column
 {
-    public static function make(array $column, string $tableName = null)
+    public static function make(array $column, ?string $tableName = null)
     {
         $name = Identifier::validate($column['name'], 'Column');
         $type = $column['type'];

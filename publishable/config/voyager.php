@@ -231,6 +231,15 @@ return [
           'image/bmp',
           'video/mp4',
         ],
+        // The allowed file extensions for the media-manager and BREAD file/image fields.
+        // Server-side executable extensions (php, phtml, phar, htaccess, ...) are always denied.
+        // Active content (html, svg, js, xml) is not allowed by default (stored XSS).
+        // Remove the key to use the defaults from TCG\Voyager\Helpers\UploadGuard, '*' allows everything else.
+        'allowed_extensions' => [
+            'jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp',
+            'pdf', 'txt', 'csv', 'doc', 'docx', 'xls', 'xlsx',
+            'zip', 'mp3', 'mp4',
+        ],
         //Path for media-manager. Relative to the filesystem.
         'path'                => '/',
         'show_folders'        => true,

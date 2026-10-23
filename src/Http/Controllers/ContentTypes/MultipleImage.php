@@ -4,8 +4,9 @@ namespace TCG\Voyager\Http\Controllers\ContentTypes;
 
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use TCG\Voyager\Helpers\UploadGuard;
 use Intervention\Image\Constraint;
-use Intervention\Image\Facades\Image as InterventionImage;
+use TCG\Voyager\Facades\Image as InterventionImage;
 
 class MultipleImage extends BaseType
 {
@@ -25,6 +26,7 @@ class MultipleImage extends BaseType
             if (!$file->isValid()) {
                 continue;
             }
+            $this->guardUpload($file, UploadGuard::IMAGE_EXTENSIONS);
 
             $image = InterventionImage::make($file)->orientate();
 
@@ -49,8 +51,8 @@ class MultipleImage extends BaseType
 
             $filename = Str::random(20);
             $path = $this->slug.DIRECTORY_SEPARATOR.date('FY').DIRECTORY_SEPARATOR;
-            array_push($filesPath, $path.$filename.'.'.$file->getClientOriginalExtension());
-            $filePath = $path.$filename.'.'.$file->getClientOriginalExtension();
+            array_push($filesPath, $path.$filename.'.'.strtolower($file->getClientOriginalExtension()));
+            $filePath = $path.$filename.'.'.strtolower($file->getClientOriginalExtension());
 
             $image = $image->resize(
                 $resize_width,
@@ -61,7 +63,7 @@ class MultipleImage extends BaseType
                         $constraint->upsize();
                     }
                 }
-            )->encode($file->getClientOriginalExtension(), $resize_quality);
+            )->encode(strtolower($file->getClientOriginalExtension()), $resize_quality);
 
             Storage::disk(config('voyager.storage.disk'))->put($filePath, (string) $image, 'public');
 
@@ -91,18 +93,18 @@ class MultipleImage extends BaseType
                                         $constraint->upsize();
                                     }
                                 }
-                            )->encode($file->getClientOriginalExtension(), $resize_quality);
+                            )->encode(strtolower($file->getClientOriginalExtension()), $resize_quality);
                     } elseif (isset($this->options->thumbnails) && isset($thumbnails->crop->width) && isset($thumbnails->crop->height)) {
                         $crop_width = $thumbnails->crop->width;
                         $crop_height = $thumbnails->crop->height;
                         $image = InterventionImage::make($file)
                             ->orientate()
                             ->fit($crop_width, $crop_height)
-                            ->encode($file->getClientOriginalExtension(), $resize_quality);
+                            ->encode(strtolower($file->getClientOriginalExtension()), $resize_quality);
                     }
 
                     Storage::disk(config('voyager.storage.disk'))->put(
-                        $path.$filename.'-'.$thumbnails->name.'.'.$file->getClientOriginalExtension(),
+                        $path.$filename.'-'.$thumbnails->name.'.'.strtolower($file->getClientOriginalExtension()),
                         (string) $image,
                         'public'
                     );

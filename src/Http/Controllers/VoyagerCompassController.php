@@ -43,10 +43,11 @@ class VoyagerCompassController extends Controller
             return $this->download(LogViewer::pathToLogFile(base64_decode($this->request->input('download'))));
         } elseif ($this->request->has('del')) {
             $active_tab = 'logs';
-            app('files')->delete(LogViewer::pathToLogFile(base64_decode($this->request->input('del'))));
+            $logFile = LogViewer::pathToLogFile(base64_decode($this->request->input('del')));
+            app('files')->delete($logFile);
 
             return redirect($this->request->url().'?logs=true')->with([
-                'message'    => __('voyager::compass.logs.delete_success').' '.base64_decode($this->request->input('del')),
+                'message'    => __('voyager::compass.logs.delete_success').' '.basename($logFile),
                 'alert-type' => 'success',
             ]);
         } elseif ($this->request->has('delall')) {
@@ -212,20 +213,21 @@ class LogViewer
      */
     public static function pathToLogFile($file)
     {
-        $logsPath = storage_path('logs');
+        // CVE-2024-55415: only existing *.log files directly inside storage/logs,
+        // absolute paths and traversal are not accepted
+        $logsPath = realpath(storage_path('logs'));
+        $file = str_replace('\\', '/', (string) $file);
+        $path = $logsPath ? realpath($logsPath.DIRECTORY_SEPARATOR.basename($file)) : false;
 
-        if (app('files')->exists($file)) { // try the absolute path
-            return $file;
+        if ($path === false
+            || basename($file) !== $file
+            || !str_ends_with(strtolower($path), '.log')
+            || dirname($path) !== $logsPath
+            || !is_file($path)) {
+            throw new \Symfony\Component\HttpKernel\Exception\NotFoundHttpException('No such log file');
         }
 
-        $file = $logsPath.'/'.$file;
-
-        // check if requested file is really in the logs directory
-        if (dirname($file) !== $logsPath) {
-            throw new \Exception('No such log file');
-        }
-
-        return $file;
+        return $path;
     }
 
     /**

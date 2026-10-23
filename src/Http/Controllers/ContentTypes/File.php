@@ -5,6 +5,7 @@ namespace TCG\Voyager\Http\Controllers\ContentTypes;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use TCG\Voyager\Helpers\UploadGuard;
 
 class File extends BaseType
 {
@@ -23,15 +24,16 @@ class File extends BaseType
         $path = $this->generatePath();
 
         foreach ($files as $file) {
+            $this->guardUpload($file);
             $filename = $this->generateFileName($file, $path);
             $file->storeAs(
                 $path,
-                $filename.'.'.$file->getClientOriginalExtension(),
+                $filename.'.'.strtolower($file->getClientOriginalExtension()),
                 config('voyager.storage.disk', 'public')
             );
 
             array_push($filesPath, [
-                'download_link' => $path.$filename.'.'.$file->getClientOriginalExtension(),
+                'download_link' => $path.$filename.'.'.strtolower($file->getClientOriginalExtension()),
                 'original_name' => $file->getClientOriginalName(),
             ]);
         }
@@ -53,18 +55,18 @@ class File extends BaseType
     protected function generateFileName($file, $path)
     {
         if (isset($this->options->preserveFileUploadName) && $this->options->preserveFileUploadName) {
-            $filename = basename($file->getClientOriginalName(), '.'.$file->getClientOriginalExtension());
+            $filename = UploadGuard::sanitizeFileName(pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME));
             $filename_counter = 1;
 
             // Make sure the filename does not exist, if it does make sure to add a number to the end 1, 2, 3, etc...
-            while (Storage::disk(config('voyager.storage.disk'))->exists($path.$filename.'.'.$file->getClientOriginalExtension())) {
-                $filename = basename($file->getClientOriginalName(), '.'.$file->getClientOriginalExtension()).(string) ($filename_counter++);
+            while (Storage::disk(config('voyager.storage.disk'))->exists($path.$filename.'.'.strtolower($file->getClientOriginalExtension()))) {
+                $filename = UploadGuard::sanitizeFileName(pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME)).(string) ($filename_counter++);
             }
         } else {
             $filename = Str::random(20);
 
             // Make sure the filename does not exist, if it does, just regenerate
-            while (Storage::disk(config('voyager.storage.disk'))->exists($path.$filename.'.'.$file->getClientOriginalExtension())) {
+            while (Storage::disk(config('voyager.storage.disk'))->exists($path.$filename.'.'.strtolower($file->getClientOriginalExtension()))) {
                 $filename = Str::random(20);
             }
         }

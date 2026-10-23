@@ -61,6 +61,8 @@ return [
     'media'                  => 'Media',
     'menu_builder'           => 'Menu Builder',
     'mimetype_not_allowed'   => 'This mimetype is not allowed',
+    'extension_not_allowed'  => 'Files with extension ":extension" are not allowed',
+    'path_not_allowed'       => 'This path is not allowed',
     'move'                   => 'Move',
     'name'                   => 'Name',
     'new'                    => 'New',

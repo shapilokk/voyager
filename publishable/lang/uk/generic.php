@@ -61,6 +61,8 @@ return [
     'media'                  => 'Медіа',
     'menu_builder'           => 'Конструктор меню',
     'mimetype_not_allowed'   => 'Цей тип файлу не підтримується',
+    'extension_not_allowed'  => 'Завантаження файлів з розширенням ":extension" заборонено',
+    'path_not_allowed'       => 'Неприпустимий шлях',
     'move'                   => 'Перемістити',
     'name'                   => 'Назва',
     'new'                    => 'Новинка',

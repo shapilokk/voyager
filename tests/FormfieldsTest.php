@@ -328,9 +328,8 @@ class FormfieldsTest extends TestCase
     public function testFormfieldFile()
     {
         $this->createBreadForFormfield('text', 'file');
-        $file = UploadedFile::fake()->create('test.txt', 1);
         $this->visitRoute('voyager.categories.create')
-        ->attach([$file->getPathName()], 'file[]')
+        ->attach([$this->namedFile('test.txt')], 'file[]')
         ->press(__('voyager::generic.save'))
         ->seeRouteIs('voyager.categories.index')
         ->visitRoute('voyager.categories.create')
@@ -346,9 +345,8 @@ class FormfieldsTest extends TestCase
         $this->createBreadForFormfield('text', 'file', json_encode([
             'preserveFileUploadName' => true,
         ]));
-        $file = UploadedFile::fake()->create('test.txt', 1);
         $this->visitRoute('voyager.categories.create')
-        ->attach([$file->getPathName()], 'file[]')
+        ->attach([$this->namedFile('test.txt')], 'file[]')
         ->press(__('voyager::generic.save'))
         ->seeRouteIs('voyager.categories.index')
         ->visitRoute('voyager.categories.create')
@@ -357,6 +355,30 @@ class FormfieldsTest extends TestCase
         ->seeInDatabase('categories', [
             'file' => '[]',
         ]);
+    }
+
+    public function testFormfieldFileRejectsExecutableExtension()
+    {
+        $this->createBreadForFormfield('text', 'file');
+        $this->visitRoute('voyager.categories.create')
+        ->attach([$this->namedFile('shell.php', '<?php echo 1;')], 'file[]')
+        ->press(__('voyager::generic.save'))
+        ->seeRouteIs('voyager.categories.create')
+        ->see(__('voyager::generic.extension_not_allowed', ['extension' => 'php']));
+
+        $this->assertEquals(0, Category::count());
+    }
+
+    /**
+     * Browser kit attaches files by path, the client name is the base name of that path.
+     */
+    private function namedFile($name, $content = 'test')
+    {
+        $dir = sys_get_temp_dir().DIRECTORY_SEPARATOR.'voyager-tests-'.uniqid();
+        mkdir($dir);
+        file_put_contents($dir.DIRECTORY_SEPARATOR.$name, $content);
+
+        return $dir.DIRECTORY_SEPARATOR.$name;
     }
 
     private function createBreadForFormfield($type, $name, $options = '')

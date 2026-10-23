@@ -129,7 +129,7 @@ if (\Illuminate\Support\Str::startsWith(Auth::user()->avatar, 'http://') || \Ill
 
     // TODO: change Controllers to use AlertsMessages trait... then remove this
     var alertType = {!! json_encode(Session::get('alert-type', 'info')) !!};
-    var alertMessage = {!! json_encode(Session::get('message')) !!};
+    var alertMessage = {!! json_encode(e(Session::get('message'))) !!};
     var alerter = toastr[alertType];
 
     if (alerter) {

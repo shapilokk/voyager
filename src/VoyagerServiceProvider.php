@@ -66,6 +66,15 @@ class VoyagerServiceProvider extends ServiceProvider
             return new Voyager();
         });
 
+        // Laravel 13 binds Illuminate\Image\ImageManager to "image", Voyager uses Intervention Image v2
+        $this->app->singleton('voyager.image', function ($app) {
+            $driver = $app['config']->get('image.driver');
+
+            return new \Intervention\Image\ImageManager([
+                'driver' => in_array($driver, ['gd', 'imagick'], true) ? $driver : 'gd',
+            ]);
+        });
+
         $this->app->singleton('VoyagerGuard', function () {
             return config('auth.defaults.guard', 'web');
         });
